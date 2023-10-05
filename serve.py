@@ -34,15 +34,6 @@ def process(prompt, image_paths):
 def index():
     return 'Hello, world!'
 
-@app.route('/timeframe_ids', methods=['POST'])
-def timeframe_ids():
-    # get image ids from database based on timeframe
-    oldest = request.json.get('oldest', datetime.min)
-    newest = request.json.get('newest', datetime.now())
-    entries = Image.query.filter(Image.timestamp >= oldest).filter(Image.timestamp <= newest).all()
-    ids = [entry.id for entry in entries]
-    return jsonify({'entries': ids}), 200
-
 @app.route('/start_job', methods=['POST'])
 def start_job():
     prompt = request.json.get('prompt', None)
@@ -77,6 +68,32 @@ def get_image(image_id):
 
     # Return the image
     return send_file(image_path, mimetype='image/png')
+
+@app.route('/get_prompt/<image_id>', methods=['GET'])
+def get_prompt(image_id):
+    # Pull from the database based on the image hash
+    image = Image.query.filter_by(id=image_id).first()
+    prompt = image.prompt
+
+    # Return the prompt
+    return jsonify({'prompt': prompt}), 200
+
+@app.route('/get_ids/timeframe', methods=['POST'])
+def timeframe():
+    # get image ids from database based on timeframe
+    oldest = request.json.get('oldest', datetime.min)
+    newest = request.json.get('newest', datetime.now())
+    entries = Image.query.filter(Image.timestamp >= oldest).filter(Image.timestamp <= newest).all()
+    ids = [entry.id for entry in entries]
+    return jsonify({'entries': ids}), 200
+
+@app.route('/get_ids/prompt', methods=['POST'])
+def prompt():
+    # Search database for prompts containing the search string
+    search_string = request.json.get('search_string', '')
+    entries = Image.query.filter(Image.prompt.contains(search_string)).all()
+    ids = [entry.id for entry in entries]
+    return jsonify({'entries': ids}), 200
 
 if __name__ == '__main__':
     with app.app_context():
