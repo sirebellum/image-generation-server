@@ -1,4 +1,4 @@
-from flask import Flask, send_file, jsonify, request
+from flask import Flask, send_file, jsonify, request, render_template
 from PIL import Image
 from models import load_models, generate_image_from_prompt
 from flask_sqlalchemy import SQLAlchemy
@@ -32,7 +32,7 @@ def process(prompt, image_paths):
 
 @app.route('/')
 def index():
-    return 'Hello, world!'
+    return render_template('index.html')
 
 @app.route('/start_job', methods=['POST'])
 def start_job():
@@ -47,7 +47,7 @@ def start_job():
     root_path = Path("/mnt/nas/images")
     image_name = datetime.now().strftime("%Y%m%d%H%M%S%f") + ".png"
     image_paths = []
-    for i in range(num_images):
+    for i in range(int(num_images)):
         image_name = str(i) + "_" + image_name
         image_path = root_path / image_name
         image = Image(str(image_path), prompt)
@@ -94,6 +94,16 @@ def prompt():
     entries = Image.query.filter(Image.prompt.contains(search_string)).all()
     ids = [entry.id for entry in entries]
     return jsonify({'entries': ids}), 200
+
+@app.route('/del_image/<image_id>', methods=['DELETE'])
+def del_image(image_id):
+    # Delete image from database and filesystem
+    image = Image.query.filter_by(id=image_id).first()
+    image_path = image.image_path
+    db.session.delete(image)
+    db.session.commit()
+    Path(image_path).unlink()
+    return jsonify({'status': 'deleted'}), 200
 
 if __name__ == '__main__':
     with app.app_context():

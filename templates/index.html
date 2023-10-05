@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Image Generator</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    #imageContainer {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, 256px);
+      gap: 16px;
+    }
+
+    #imageContainer img {
+      width: 256px;
+      height: auto;
+    }
+
+    #prompt {
+      width: 200px;
+      height: 100px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Display Images -->
+  <h1>Images</h1>
+  <div id="imageContainer">
+  <!-- Images will be appended here -->
+  </div>
+
+  <!-- Start Job -->
+  <h1>Start Job</h1>
+  <form id="startJobForm">
+    <label for="prompt">Prompt:</label>
+    <input type="text" id="prompt" name="prompt">
+    <label for="num_images">Number of Images:</label>
+    <input type="number" id="num_images" name="num_images" min="1" value="1">
+    <button type="submit">Start</button>
+  </form>
+
+  <!-- Search -->
+  <h1>Search History</h1>
+  <form id="searchForm">
+    <label for="search_string">Search by Prompt:</label>
+    <input type="text" id="search_string" name="search_string">
+    <button type="submit">Search</button>
+  </form>
+
+  <!-- Scripts -->
+  <script>
+    $(document).ready(function() {
+        // Start Job
+        $('#startJobForm').submit(function(e) {
+        e.preventDefault();
+        let prompt = $('#prompt').val();
+        let num_images = $('#num_images').val();
+        $.ajax({
+            url: '/start_job',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({prompt: prompt, num_images: num_images}),
+            success: function(data) {
+            alert(data.status);
+            }
+        });
+        });
+
+        // Function to delete image
+        $(document).on('click', '.delete-button', function() {
+        let imageId = $(this).data('id');
+        $.ajax({
+            url: '/del_image/' + imageId,
+            type: 'DELETE',
+            success: function(data) {
+            // Remove the image element from the DOM
+            $('#image_' + imageId).remove();
+            alert(data.status);
+            }
+        });
+        });
+
+        // Search
+        $('#searchForm').submit(function(e) {
+        e.preventDefault();
+        let searchString = $('#search_string').val();
+        $.ajax({
+            url: '/get_ids/prompt',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({search_string: searchString}),
+            success: function(data) {
+            $('#imageContainer').empty(); // Clear existing images
+            data.entries.forEach(function(imageId) {
+                // Fetch each image
+                let imageUrl = '/get_image/' + imageId;
+                $('#imageContainer').append('<div id="image_' + imageId + '"><img src="' + imageUrl + '"><button class="delete-button" data-id="' + imageId + '">X</button></div>');
+            });
+            }
+        });
+        });
+    });
+  </script>
+
+</body>
+</html>
