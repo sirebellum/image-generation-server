@@ -4,14 +4,8 @@
   <title>Image Generator</title>
   <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <style>
-    .resizable-image {
-        resize: both;
-        overflow: auto;
-        width: 256px;
-        height: auto;
-    }
-  </style>
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 </head>
 <body class="bg-light">
 
@@ -61,27 +55,8 @@
  <!-- Scripts -->
  <script>
     $(document).ready(function() {
-
-        let originalWidth, originalHeight;
-
-        $(document).on('mousedown', '.resizable', function(e) {
-        originalWidth = $(this).width();
-        originalHeight = $(this).height();
-        });
-
-        $(document).on('mouseup', '.resizable', function(e) {
-        let newWidth = $(this).width();
-        let newHeight = $(this).height();
-
-        if (newWidth !== originalWidth || newHeight !== originalHeight) {
-            $('.resizable').width(newWidth).height(newHeight);
-            $('.resizable-image').width('100%').height('auto');
-        }
-        });
-
-        $(document).ready(function() {
-            // Start Job form submission
-            $('#startJobForm').submit(function(e) {
+        // Start Job form submission
+        $('#startJobForm').submit(function(e) {
             e.preventDefault();
             let prompt = $('#prompt').val();  // Assume the id for the prompt textarea is 'prompt'
             let numImages = $('#num_images').val();
@@ -102,66 +77,67 @@
                 }
                 }
             });
-            });
+        });
 
-            // Function to delete image
-            // $(document).on('click', '.delete-button', function() {
-            // let imageId = $(this).data('id');
-            // $.ajax({
-            //     url: '/del_image/' + imageId,
-            //     type: 'DELETE',
-            //     success: function(data) {
-            //     // Remove the image element from the DOM
-            //     $('#image_' + imageId).remove();
-            //     $('#message').text(data.status).fadeIn().delay(3000).fadeOut();
-            //     }
-            // });
-            // });
-
-            // Search
-            $('#searchForm').submit(function(e) {
-                e.preventDefault();
-                let searchString = $('#search_string').val();
-                let lowRes = $('#lowRes').is(':checked');  // New line to check for low-res option
-                $.ajax({
+        // Function to search
+        $('#searchForm').submit(function(e) {
+            e.preventDefault();
+            let searchString = $('#search_string').val();
+            let lowRes = $('#lowRes').is(':checked');
+            $.ajax({
                 url: '/get_ids/prompt',
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({search_string: searchString}),
                 success: function(data) {
-                    $('#imageContainer').empty(); // Clear existing images
-                    
-                    let imagesByPrompt = {}; // To store image IDs grouped by their prompts
+                    let imagesByPrompt = {};  // To store image IDs grouped by their prompts
+                    let promises = [];  // To hold all AJAX promises
 
                     // Fetch prompt for each image ID and organize by prompt
                     data.entries.forEach(function(imageId) {
-                        $.get('/get_prompt/' + imageId, function(promptData) {
-                        let prompt = promptData.prompt;
-                        if (!imagesByPrompt[prompt]) {
-                            imagesByPrompt[prompt] = [];
-                        }
-                        imagesByPrompt[prompt].push(imageId);
+                        let promise = $.get('/get_prompt/' + imageId, function(promptData) {
+                            let prompt = promptData.prompt;
+                            if (!imagesByPrompt[prompt]) {
+                                imagesByPrompt[prompt] = [];
+                            }
+                            imagesByPrompt[prompt].push(imageId);
+                        });
+                        promises.push(promise);
+                    });
 
-                        // Update the DOM
-                        $('#imageContainer').empty();
-                        for (let prompt in imagesByPrompt) {
-                        let groupDiv = $('<div class="image-group" style="width: 100%;"></div>');
-                        groupDiv.append('<h2>' + prompt + '</h2>');
+                // When all AJAX calls are done, update the DOM
+                $.when.apply($, promises).then(function() {
+                    $('#imageContainer').empty();
+                    for (let prompt in imagesByPrompt) {
+                        let groupDiv = $('<div class="image-group" style="width: 100%; position: relative;"></div>');  // Add position: relative
+                        let title = $('<h2 style="z-index: 2;">' + prompt + '</h2>');  // Add z-index
+                        groupDiv.append(title);
 
                         let imageIds = imagesByPrompt[prompt];
                         imageIds.forEach(function(imageId) {
-                            let imageUrl = lowRes ? '/get_image_thumbnail/' + imageId : '/get_image/' + imageId;  // Conditionally set the URL based on checkbox
-                            let resizableDiv = $('<div class="resizable" style="display: inline-block; width: 256px; height: auto; resize: both; overflow: hidden;"></div>');
-                            resizableDiv.append('<img class="resizable-image" src="' + imageUrl + '" style="width: 100%; height: auto;">');
+                            let imageUrl = lowRes ? '/get_image_thumbnail/' + imageId : '/get_image/' + imageId;
+                            let resizableImage = $('<img class="resizable-image" src="' + imageUrl + '" style="width: 100%; height: auto; z-index: 1;">');  // Add z-index
+                            let resizableDiv = $('<div class="resizable" style="display: inline-block; width: 256px; height: auto; z-index: 1;"></div>');  // Add z-index
+                            resizableDiv.append(resizableImage);
+                            resizableDiv.resizable({
+                                resize: function(event, ui) {
+                                    $('.resizable').css({
+                                        'width': ui.size.width,
+                                        'height': ui.size.height
+                                    });
+                                    $('.resizable-image').css({
+                                        'width': '100%',
+                                        'height': 'auto'
+                                    });
+                                }
+                            });
                             groupDiv.append(resizableDiv);
                         });
 
-                    $('#imageContainer').append(groupDiv);
+                        $('#imageContainer').append(groupDiv);
                     }
-                    });
                 });
                 }
-            });
             });
         });
     });

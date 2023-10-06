@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 import threading
 from io import BytesIO
+import torch
 base, refiner = load_models()
 running = False
 
@@ -87,6 +88,9 @@ def start_job():
         db.session.commit()
         image_paths.append(image_path)
 
+    # Clear cuda memory
+    torch.cuda.empty_cache()
+
     thread = threading.Thread(target=process, args=(prompt,image_paths,))
     thread.start()
 
@@ -154,4 +158,13 @@ def del_image(image_id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+    
+    # Delete entries which don't have a corresponding image
+    with app.app_context():
+        entries = ImageEntry.query.all()
+        for entry in entries:
+            if not Path(entry.image_path).exists():
+                db.session.delete(entry)
+                db.session.commit()
+
     app.run(debug=False, host='192.168.69.4')
