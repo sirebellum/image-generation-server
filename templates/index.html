@@ -105,18 +105,18 @@
             });
 
             // Function to delete image
-            $(document).on('click', '.delete-button', function() {
-            let imageId = $(this).data('id');
-            $.ajax({
-                url: '/del_image/' + imageId,
-                type: 'DELETE',
-                success: function(data) {
-                // Remove the image element from the DOM
-                $('#image_' + imageId).remove();
-                $('#message').text(data.status).fadeIn().delay(3000).fadeOut();
-                }
-            });
-            });
+            // $(document).on('click', '.delete-button', function() {
+            // let imageId = $(this).data('id');
+            // $.ajax({
+            //     url: '/del_image/' + imageId,
+            //     type: 'DELETE',
+            //     success: function(data) {
+            //     // Remove the image element from the DOM
+            //     $('#image_' + imageId).remove();
+            //     $('#message').text(data.status).fadeIn().delay(3000).fadeOut();
+            //     }
+            // });
+            // });
 
             // Search
             $('#searchForm').submit(function(e) {
@@ -152,7 +152,7 @@
                         imageIds.forEach(function(imageId) {
                             let imageUrl = lowRes ? '/get_image_thumbnail/' + imageId : '/get_image/' + imageId;  // Conditionally set the URL based on checkbox
                             let resizableDiv = $('<div class="resizable" style="display: inline-block; width: 256px; height: auto; resize: both; overflow: hidden;"></div>');
-                            resizableDiv.append('<img class="resizable-image" src="' + imageUrl + '" style="width: 100%; height: auto;"><button class="delete-button" data-id="' + imageId + '">X</button>');
+                            resizableDiv.append('<img class="resizable-image" src="' + imageUrl + '" style="width: 100%; height: auto;">');
                             groupDiv.append(resizableDiv);
                         });
 
