@@ -39,6 +39,10 @@
             <label for="search_string">Search by Prompt</label>
             <input type="text" id="search_string" name="search_string" class="form-control">
           </div>
+          <div class="form-group form-check">
+            <input type="checkbox" class="form-check-input" id="lowRes">
+            <label class="form-check-label" for="lowRes">Low Resolution</label>
+          </div>          
           <button type="submit" class="btn btn-secondary">Search</button>
         </form>
 
@@ -116,40 +120,41 @@
 
             // Search
             $('#searchForm').submit(function(e) {
-            e.preventDefault();
-            let searchString = $('#search_string').val();
-            $.ajax({
+                e.preventDefault();
+                let searchString = $('#search_string').val();
+                let lowRes = $('#lowRes').is(':checked');  // New line to check for low-res option
+                $.ajax({
                 url: '/get_ids/prompt',
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({search_string: searchString}),
                 success: function(data) {
-                $('#imageContainer').empty(); // Clear existing images
-                
-                let imagesByPrompt = {}; // To store image IDs grouped by their prompts
+                    $('#imageContainer').empty(); // Clear existing images
+                    
+                    let imagesByPrompt = {}; // To store image IDs grouped by their prompts
 
-                // Fetch prompt for each image ID and organize by prompt
-                data.entries.forEach(function(imageId) {
-                    $.get('/get_prompt/' + imageId, function(promptData) {
-                    let prompt = promptData.prompt;
-                    if (!imagesByPrompt[prompt]) {
-                        imagesByPrompt[prompt] = [];
-                    }
-                    imagesByPrompt[prompt].push(imageId);
+                    // Fetch prompt for each image ID and organize by prompt
+                    data.entries.forEach(function(imageId) {
+                        $.get('/get_prompt/' + imageId, function(promptData) {
+                        let prompt = promptData.prompt;
+                        if (!imagesByPrompt[prompt]) {
+                            imagesByPrompt[prompt] = [];
+                        }
+                        imagesByPrompt[prompt].push(imageId);
 
-                    // Update the DOM
-                    $('#imageContainer').empty();
-                    for (let prompt in imagesByPrompt) {
-                    let groupDiv = $('<div class="image-group" style="width: 100%;"></div>');
-                    groupDiv.append('<h2>' + prompt + '</h2>');
+                        // Update the DOM
+                        $('#imageContainer').empty();
+                        for (let prompt in imagesByPrompt) {
+                        let groupDiv = $('<div class="image-group" style="width: 100%;"></div>');
+                        groupDiv.append('<h2>' + prompt + '</h2>');
 
-                    let imageIds = imagesByPrompt[prompt];
-                    imageIds.forEach(function(imageId) {
-                        let imageUrl = '/get_image/' + imageId;
-                        let resizableDiv = $('<div class="resizable" style="display: inline-block; width: 256px; height: auto; resize: both; overflow: hidden;"></div>');
-                        resizableDiv.append('<img class="resizable-image" src="' + imageUrl + '" style="width: 100%; height: auto;"><button class="delete-button" data-id="' + imageId + '">X</button>');
-                        groupDiv.append(resizableDiv);
-                    });
+                        let imageIds = imagesByPrompt[prompt];
+                        imageIds.forEach(function(imageId) {
+                            let imageUrl = lowRes ? '/get_image_thumbnail/' + imageId : '/get_image/' + imageId;  // Conditionally set the URL based on checkbox
+                            let resizableDiv = $('<div class="resizable" style="display: inline-block; width: 256px; height: auto; resize: both; overflow: hidden;"></div>');
+                            resizableDiv.append('<img class="resizable-image" src="' + imageUrl + '" style="width: 100%; height: auto;"><button class="delete-button" data-id="' + imageId + '">X</button>');
+                            groupDiv.append(resizableDiv);
+                        });
 
                     $('#imageContainer').append(groupDiv);
                     }

@@ -14,6 +14,7 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from pathlib import Path
 import threading
+from io import BytesIO
 base, refiner = load_models()
 running = False
 
@@ -22,7 +23,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///images.db'
 app.secret_key = 'landofgwynn'
 
 db = SQLAlchemy(app)
-class Image(db.Model):
+class ImageEntry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     image_path = db.Column(db.String(255), unique=True)
     prompt = db.Column(db.String(4096), unique=False)
@@ -81,7 +82,7 @@ def start_job():
     for i in range(int(num_images)):
         image_name = str(i) + "_" + date_string
         image_path = root_path / image_name
-        image = Image(str(image_path), prompt)
+        image = ImageEntry(str(image_path), prompt)
         db.session.add(image)
         db.session.commit()
         image_paths.append(image_path)
@@ -94,16 +95,30 @@ def start_job():
 @app.route('/get_image/<image_id>', methods=['GET'])
 def get_image(image_id):
     # Pull from the database based on the image hash
-    image = Image.query.filter_by(id=image_id).first()
+    image = ImageEntry.query.filter_by(id=image_id).first()
     image_path = image.image_path
 
     # Return the image
     return send_file(image_path, mimetype='image/png')
 
+@app.route('/get_image_thumbnail/<image_id>', methods=['GET'])
+def get_image_thumbnail(image_id):
+    # Pull from the database based on the image hash
+    image = ImageEntry.query.filter_by(id=image_id).first()
+    image_path = image.image_path
+
+    image = Image.open(image_path)
+    image.thumbnail((256, 256))
+    byte_io = BytesIO()
+    image.save(byte_io, 'PNG')
+    byte_io.seek(0)
+
+    return send_file(byte_io, mimetype='image/png')
+
 @app.route('/get_prompt/<image_id>', methods=['GET'])
 def get_prompt(image_id):
     # Pull from the database based on the image hash
-    image = Image.query.filter_by(id=image_id).first()
+    image = ImageEntry.query.filter_by(id=image_id).first()
     prompt = image.prompt
 
     # Return the prompt
@@ -114,7 +129,7 @@ def timeframe():
     # get image ids from database based on timeframe
     oldest = request.json.get('oldest', datetime.min)
     newest = request.json.get('newest', datetime.now())
-    entries = Image.query.filter(Image.timestamp >= oldest).filter(Image.timestamp <= newest).all()
+    entries = ImageEntry.query.filter(ImageEntry.timestamp >= oldest).filter(ImageEntry.timestamp <= newest).all()
     ids = [entry.id for entry in entries]
     return jsonify({'entries': ids}), 200
 
@@ -122,14 +137,14 @@ def timeframe():
 def prompt():
     # Search database for prompts containing the search string
     search_string = request.json.get('search_string', '')
-    entries = Image.query.filter(Image.prompt.contains(search_string)).all()
+    entries = ImageEntry.query.filter(ImageEntry.prompt.contains(search_string)).all()
     ids = [entry.id for entry in entries]
     return jsonify({'entries': ids}), 200
 
 @app.route('/del_image/<image_id>', methods=['DELETE'])
 def del_image(image_id):
     # Delete image from database and filesystem
-    image = Image.query.filter_by(id=image_id).first()
+    image = ImageEntry.query.filter_by(id=image_id).first()
     image_path = image.image_path
     db.session.delete(image)
     db.session.commit()
