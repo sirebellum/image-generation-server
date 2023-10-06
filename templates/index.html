@@ -2,103 +2,162 @@
 <html>
 <head>
   <title>Image Generator</title>
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <style>
-    #imageContainer {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, 256px);
-      gap: 16px;
-    }
-
-    #imageContainer img {
-      width: 256px;
-      height: auto;
-    }
-
-    #prompt {
-      width: 300px;
-      height: 50px;
+    .resizable-image {
+        resize: both;
+        overflow: auto;
+        width: 256px;
+        height: auto;
     }
   </style>
 </head>
-<body>
+<body class="bg-light">
 
-  <!-- Display Images -->
-  <h1>Images</h1>
-  <div id="imageContainer">
-  <!-- Images will be appended here -->
+  <div class="container mt-4">
+    <div class="row">
+      <div class="col">
+        <!-- Start Job -->
+        <h1 class="mb-4">AI Image Generator</h1>
+        <form id="startJobForm">
+          <div class="form-group">
+            <label for="prompt">Prompt</label>
+            <textarea id="prompt" name="prompt" class="form-control" rows="1"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="num_images">Number of Images</label>
+            <input type="number" id="num_images" name="num_images" class="form-control" min="1" value="1">
+          </div>
+          <button type="submit" class="btn btn-primary">Start</button>
+        </form>
+
+        <!-- Search -->
+        <h1 class="mt-5 mb-4">Search</h1>
+        <form id="searchForm">
+          <div class="form-group">
+            <label for="search_string">Search by Prompt</label>
+            <input type="text" id="search_string" name="search_string" class="form-control">
+          </div>
+          <button type="submit" class="btn btn-secondary">Search</button>
+        </form>
+
+        <!-- Message -->
+        <div id="message" class="alert alert-info mt-4" style="display: none;"></div>
+
+        <!-- Display Images -->
+        <h1 class="mt-5 mb-4">Images</h1>
+        <div id="imageContainer" class="d-flex flex-wrap">
+          <!-- Images will be appended here -->
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- Start Job -->
-  <h1>Start Job</h1>
-  <form id="startJobForm">
-    <label for="prompt">Prompt:</label>
-    <input type="text" id="prompt" name="prompt">
-    <br>
-    <label for="num_images">Number of Images:</label>
-    <input type="number" id="num_images" name="num_images" min="1" value="1">
-    <button type="submit">Start</button>
-  </form>
-
-  <!-- Search -->
-  <h1>Search History</h1>
-  <form id="searchForm">
-    <label for="search_string">Search by Prompt:</label>
-    <input type="text" id="search_string" name="search_string">
-    <button type="submit">Search</button>
-  </form>
-
-  <!-- Scripts -->
-  <script>
+ <!-- Scripts -->
+ <script>
     $(document).ready(function() {
-        // Start Job
-        $('#startJobForm').submit(function(e) {
-        e.preventDefault();
-        let prompt = $('#prompt').val();
-        let num_images = $('#num_images').val();
-        $.ajax({
-            url: '/start_job',
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({prompt: prompt, num_images: num_images}),
-            success: function(data) {
-            alert(data.status);
-            }
-        });
+
+        let originalWidth, originalHeight;
+
+        $(document).on('mousedown', '.resizable', function(e) {
+        originalWidth = $(this).width();
+        originalHeight = $(this).height();
         });
 
-        // Function to delete image
-        $(document).on('click', '.delete-button', function() {
-        let imageId = $(this).data('id');
-        $.ajax({
-            url: '/del_image/' + imageId,
-            type: 'DELETE',
-            success: function(data) {
-            // Remove the image element from the DOM
-            $('#image_' + imageId).remove();
-            alert(data.status);
-            }
-        });
+        $(document).on('mouseup', '.resizable', function(e) {
+        let newWidth = $(this).width();
+        let newHeight = $(this).height();
+
+        if (newWidth !== originalWidth || newHeight !== originalHeight) {
+            $('.resizable').width(newWidth).height(newHeight);
+            $('.resizable-image').width('100%').height('auto');
+        }
         });
 
-        // Search
-        $('#searchForm').submit(function(e) {
-        e.preventDefault();
-        let searchString = $('#search_string').val();
-        $.ajax({
-            url: '/get_ids/prompt',
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({search_string: searchString}),
-            success: function(data) {
-            $('#imageContainer').empty(); // Clear existing images
-            data.entries.forEach(function(imageId) {
-                // Fetch each image
-                let imageUrl = '/get_image/' + imageId;
-                $('#imageContainer').append('<div id="image_' + imageId + '"><img src="' + imageUrl + '"><button class="delete-button" data-id="' + imageId + '">X</button></div>');
+        $(document).ready(function() {
+            // Start Job form submission
+            $('#startJobForm').submit(function(e) {
+            e.preventDefault();
+            let prompt = $('#prompt').val();  // Assume the id for the prompt textarea is 'prompt'
+            let numImages = $('#num_images').val();
+
+            $.ajax({
+                url: '/start_job',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({prompt: prompt, num_images: numImages}),
+                success: function(data) {
+                if (data.status === 'queued') {
+                    // Populate the search input box with the submitted prompt
+                    $('#search_string').val(prompt);
+                    $('#message').text("Please wait while we generate your image(s)").fadeIn().delay(3000).fadeOut();
+
+                    // You can also automatically trigger the search here if you want
+                    // $('#searchForm').submit();
+                }
+                }
             });
-            }
-        });
+            });
+
+            // Function to delete image
+            $(document).on('click', '.delete-button', function() {
+            let imageId = $(this).data('id');
+            $.ajax({
+                url: '/del_image/' + imageId,
+                type: 'DELETE',
+                success: function(data) {
+                // Remove the image element from the DOM
+                $('#image_' + imageId).remove();
+                $('#message').text(data.status).fadeIn().delay(3000).fadeOut();
+                }
+            });
+            });
+
+            // Search
+            $('#searchForm').submit(function(e) {
+            e.preventDefault();
+            let searchString = $('#search_string').val();
+            $.ajax({
+                url: '/get_ids/prompt',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({search_string: searchString}),
+                success: function(data) {
+                $('#imageContainer').empty(); // Clear existing images
+                
+                let imagesByPrompt = {}; // To store image IDs grouped by their prompts
+
+                // Fetch prompt for each image ID and organize by prompt
+                data.entries.forEach(function(imageId) {
+                    $.get('/get_prompt/' + imageId, function(promptData) {
+                    let prompt = promptData.prompt;
+                    if (!imagesByPrompt[prompt]) {
+                        imagesByPrompt[prompt] = [];
+                    }
+                    imagesByPrompt[prompt].push(imageId);
+
+                    // Update the DOM
+                    $('#imageContainer').empty();
+                    for (let prompt in imagesByPrompt) {
+                    let groupDiv = $('<div class="image-group" style="width: 100%;"></div>');
+                    groupDiv.append('<h2>' + prompt + '</h2>');
+
+                    let imageIds = imagesByPrompt[prompt];
+                    imageIds.forEach(function(imageId) {
+                        let imageUrl = '/get_image/' + imageId;
+                        let resizableDiv = $('<div class="resizable" style="display: inline-block; width: 256px; height: auto; resize: both; overflow: hidden;"></div>');
+                        resizableDiv.append('<img class="resizable-image" src="' + imageUrl + '" style="width: 100%; height: auto;"><button class="delete-button" data-id="' + imageId + '">X</button>');
+                        groupDiv.append(resizableDiv);
+                    });
+
+                    $('#imageContainer').append(groupDiv);
+                    }
+                    });
+                });
+                }
+            });
+            });
         });
     });
   </script>

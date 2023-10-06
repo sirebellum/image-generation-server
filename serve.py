@@ -1,4 +1,13 @@
-from flask import Flask, send_file, jsonify, request, render_template
+from flask import (
+    Flask,
+    send_file,
+    jsonify,
+    request,
+    render_template,
+    redirect,
+    url_for,
+    session
+)
 from PIL import Image
 from models import load_models, generate_image_from_prompt
 from flask_sqlalchemy import SQLAlchemy
@@ -10,6 +19,7 @@ running = False
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///images.db'
+app.secret_key = 'landofgwynn'
 
 db = SQLAlchemy(app)
 class Image(db.Model):
@@ -30,9 +40,30 @@ def process(prompt, image_paths):
         image.save(path)
     running = False
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        password = request.form['password']
+        
+        # Replace this with actual password verification
+        if password == app.secret_key:
+            session['logged_in'] = True
+            return redirect(url_for('index'))
+        
+        return "Invalid password"
+        
+    return render_template('login.html')
+
 @app.route('/')
 def index():
-    return render_template('index.html')
+    if session.get('logged_in'):
+        return render_template('index.html')
+    return redirect(url_for('login'))
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    return redirect(url_for('index'))
 
 @app.route('/start_job', methods=['POST'])
 def start_job():
@@ -45,10 +76,10 @@ def start_job():
 
     # Save the image hash and prompt to the database
     root_path = Path("/mnt/nas/images")
-    image_name = datetime.now().strftime("%Y%m%d%H%M%S%f") + ".png"
+    date_string = datetime.now().strftime("%Y%m%d%H%M%S%f") + ".png"
     image_paths = []
     for i in range(int(num_images)):
-        image_name = str(i) + "_" + image_name
+        image_name = str(i) + "_" + date_string
         image_path = root_path / image_name
         image = Image(str(image_path), prompt)
         db.session.add(image)
